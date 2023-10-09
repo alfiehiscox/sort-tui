@@ -36,8 +36,8 @@ func getRandomItems() []Item {
 	values := rand.Perm(SIZE)
 	for _, value := range values {
 		items = append(items, Item{
-			Value: value,
-			Bar:   makeBar(value),
+			Value: value + 1,
+			Bar:   makeBar(value + 1),
 			Color: lipgloss.Color("1"),
 		})
 	}
