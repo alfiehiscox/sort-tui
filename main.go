@@ -7,6 +7,7 @@ import (
 	"github.com/alfiehiscox/sort-tui/sorter"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wordwrap"
 )
 
 func main() {
@@ -19,7 +20,7 @@ func main() {
 		VisualisationRunning: false,
 	}
 
-	p := tea.NewProgram(main, tea.WithAltScreen())
+	p := tea.NewProgram(main)
 	if _, err := p.Run(); err != nil {
 		fmt.Println("error running program:", err)
 		os.Exit(1)
@@ -99,9 +100,12 @@ func (m MainModel) View() string {
 	var sorters string
 	for i, sorter := range m.Sorters {
 		if i == m.FocusedSorter {
-			sorters += navItem.Copy().Background(selected).Render(sorter.Name()) + "\n"
+			sorters += navItem.Copy().
+				Background(selected).
+				Render(sorter.Name()) + "\n"
 		} else {
-			sorters += navItem.Copy().Render(sorter.Name()) + "\n"
+			sorters += navItem.Copy().
+				Render(sorter.Name()) + "\n"
 		}
 	}
 
@@ -117,60 +121,36 @@ func (m MainModel) View() string {
 			sorters,
 		))
 
-	// Info/Code Section (3 Column wide)
+	// Info Section (3 Column wide)
+	gap := lipgloss.NewStyle().Height(1).Width(m.ColumnWidth*3 - 2).Render()
 	infoTitle := lipgloss.NewStyle().
 		Height(1).
 		Width(m.ColumnWidth*3-2).
-		Border(lipgloss.NormalBorder(), false, false, true, false).
+		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(subtle).
 		Render(m.Sorters[m.SelectedSorter].Name())
-
-	detailsTab := lipgloss.NewStyle().
-		Height(1).
-		Width((m.ColumnWidth*3-2)/2).
-		Border(lipgloss.NormalBorder(), false, false, true, false).
+	descriptionText := wordwrap.String(m.Sorters[m.SelectedSorter].Description(), m.ColumnWidth*3-2)
+	description := lipgloss.NewStyle().
+		Align(lipgloss.Left).
+		Render(descriptionText + "\n\n")
+	complexity := "Complexity: \n"
+	complexity += RenderComplexity(m.Sorters[m.SelectedSorter].Complexity(), m.ColumnWidth*3-2)
+	main := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, true, false, false).
 		BorderForeground(subtle).
-		Align(lipgloss.Center)
+		Height(base.GetHeight()).
+		Width(m.ColumnWidth*3).
+		Padding(0, 1).
+		Render(lipgloss.JoinVertical(lipgloss.Top, gap, infoTitle, description, complexity))
 
-	codeTab := lipgloss.NewStyle().
+	// Visualisation Section (2 Column wide)
+
+	visTitle := lipgloss.NewStyle().
 		Height(1).
-		Width((m.ColumnWidth*3-2)/2).
-		Border(lipgloss.NormalBorder(), false, false, true, false).
+		Width(m.ColumnWidth*3-2).
+		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(subtle).
-		Align(lipgloss.Center)
-
-	var main string
-	if m.CodeView {
-		tabs := lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			detailsTab.Render("details"),
-			codeTab.Background(selected).Render("code"),
-		)
-		main = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), false, true, false, false).
-			BorderForeground(subtle).
-			Height(base.GetHeight()).
-			Width(m.ColumnWidth*3).
-			Padding(0, 1).
-			Render(lipgloss.JoinVertical(lipgloss.Top, infoTitle, tabs))
-	} else {
-		tabs := lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			detailsTab.Background(selected).Render("details"),
-			codeTab.Render("code"),
-		)
-		complexity := "Complexity: \n"
-		complexity += RenderComplexity(m.Sorters[m.SelectedSorter].Complexity(), m.ColumnWidth*3-2)
-		main = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), false, true, false, false).
-			BorderForeground(subtle).
-			Height(base.GetHeight()).
-			Width(m.ColumnWidth*3).
-			Padding(0, 1).
-			Render(lipgloss.JoinVertical(lipgloss.Top, infoTitle, tabs, complexity))
-	}
-
-	// Visualisation Section
+		Render("visualisation")
 	vis := lipgloss.NewStyle().
 		Height(base.GetHeight()).
 		Width(m.ColumnWidth*2).
@@ -199,7 +179,7 @@ func RenderComplexity(c sorter.Complexity, width int) string {
 		Width(columnWidth * 3).Render("time")
 	space := cell.Copy().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
-		Render("time")
+		Render("space")
 	timeBest := cell.Render("best")
 	timeAvg := cell.Render("avg")
 	timeWorst := cell.Render("worst")
