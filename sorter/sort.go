@@ -2,6 +2,7 @@ package sorter
 
 import (
 	"bytes"
+	"math/rand"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,7 +14,7 @@ type SorterType string
 
 var Sorters = []Sorter{
 	&InsertionSort{},
-	&AlfieSort{},
+	// &AlfieSort{},
 }
 
 type Item struct {
@@ -29,29 +30,38 @@ type Complexity struct {
 	SpaceWorst string
 }
 
+type FinishMsg struct{}
 type UpdateMsg []Item
-type FinishMsg bool
 
 type Sorter interface {
 	Name() string
 	Description() string
-	Sort([]Item, func(tea.Msg))
+	Sort([]Item, chan []Item) tea.Cmd
+	WaitForSort(chan []Item) tea.Cmd
 	Complexity() Complexity
 }
 
 type InsertionSort struct{}
 
-func (is *InsertionSort) Sort(items []Item, update func(tea.Msg)) {
-	for i := range items {
-		for j := i; j > 0 && items[j-1].Value > items[j].Value; j-- {
-			items[j], items[j-1] = items[j-1], items[j]
-			items[j-1].Focused = true
-			update(UpdateMsg(items))
-			time.Sleep(100 * time.Millisecond)
-			items[j-1].Focused = false
+func (is *InsertionSort) Sort(items []Item, sub chan []Item) tea.Cmd {
+	return func() tea.Msg {
+		for i := range items {
+			for j := i; j > 0 && items[j-1].Value > items[j].Value; j-- {
+				items[j], items[j-1] = items[j-1], items[j]
+				items[j-1].Focused = true
+				sub <- items
+				time.Sleep(100 * time.Millisecond)
+				items[j-1].Focused = false
+			}
 		}
+		return FinishMsg{}
 	}
-	update(FinishMsg(true))
+}
+
+func (is *InsertionSort) WaitForSort(sub chan []Item) tea.Cmd {
+	return func() tea.Msg {
+		return UpdateMsg(<-sub)
+	}
 }
 
 func (is *InsertionSort) Description() string {
@@ -75,30 +85,17 @@ func (is *InsertionSort) Complexity() Complexity {
 	}
 }
 
-type AlfieSort struct{}
-
-func (is *AlfieSort) Sort(items []Item, update func(tea.Msg)) {
-	for i := range items {
-		for j := i; j > 0 && items[j-1].Value > items[j].Value; j-- {
-			items[j], items[j-1] = items[j-1], items[j]
-			items[j-1].Focused = true
-			update(UpdateMsg(items))
-			time.Sleep(100 * time.Millisecond)
-			items[j-1].Focused = false
-		}
+func GetRandomItems(size int) []Item {
+	var items []Item
+	values := rand.Perm(size)
+	for i, value := range values {
+		items = append(items, Item{
+			Value:   value + 1,
+			Bar:     makeBar(value),
+			Focused: i == 0,
+		})
 	}
-	update(FinishMsg(true))
-}
-
-func (is *AlfieSort) Description() string { return "INSERTION DISCRIPTION" }
-func (is *AlfieSort) Name() string        { return "alfiesort" }
-func (is *AlfieSort) Complexity() Complexity {
-	return Complexity{
-		TimeBest:   "O(n^6)",
-		TimeWorst:  "O(n^n)",
-		TimeAvg:    "O(e)",
-		SpaceWorst: "O(!)",
-	}
+	return items
 }
 
 func makeBar(size int) string {

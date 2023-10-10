@@ -10,17 +10,21 @@ import (
 	"github.com/muesli/reflow/wordwrap"
 )
 
+var p *tea.Program
+
 func main() {
 
 	main := MainModel{
 		Sorters:              sorter.Sorters,
 		SelectedSorter:       0,
 		FocusedSorter:        0,
-		CodeView:             false,
 		VisualisationRunning: false,
+		VisualisationRan:     false,
+		Items:                sorter.GetRandomItems(VISUALISATION_SIZE),
+		Sub:                  make(chan []sorter.Item),
 	}
 
-	p := tea.NewProgram(main)
+	p = tea.NewProgram(main)
 	if _, err := p.Run(); err != nil {
 		fmt.Println("error running program:", err)
 		os.Exit(1)
@@ -29,9 +33,10 @@ func main() {
 
 // MAIN UI Element
 const (
-	COLUMN_NUM        = 6 // How many vertical columns are there
-	MARGIN_VERTICAL   = 0
-	MARGIN_HORIZONTAL = 1
+	COLUMN_NUM         = 6 // How many vertical columns are there
+	MARGIN_VERTICAL    = 0
+	MARGIN_HORIZONTAL  = 1
+	VISUALISATION_SIZE = 19
 )
 
 var ()
@@ -42,8 +47,11 @@ type MainModel struct {
 	Sorters              []sorter.Sorter
 	SelectedSorter       int // Actually being rendered
 	FocusedSorter        int // Highlighted Over
-	CodeView             bool
 	VisualisationRunning bool
+	VisualisationRan     bool
+
+	Items []sorter.Item // Item Visualiser
+	Sub   chan []sorter.Item
 }
 
 func (m MainModel) Init() tea.Cmd { return nil }
@@ -54,24 +62,52 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Width, m.Height = msg.Width-MARGIN_HORIZONTAL, msg.Height-MARGIN_VERTICAL
 		m.ColumnWidth = m.Width / COLUMN_NUM
 		return m, nil
+	case sorter.UpdateMsg:
+		m.Items = msg
+		sorter := m.Sorters[m.SelectedSorter]
+		return m, sorter.WaitForSort(m.Sub)
+	case sorter.FinishMsg:
+		m.VisualisationRunning = false
+		m.VisualisationRan = true
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "enter":
+			if m.VisualisationRunning {
+				return m, nil
+			}
 			m.SelectedSorter = m.FocusedSorter
 		case "down", "j":
+			if m.VisualisationRunning {
+				return m, nil
+			}
 			if m.FocusedSorter < len(m.Sorters)-1 {
 				m.FocusedSorter++
 			}
 		case "up", "k":
+			if m.VisualisationRunning {
+				return m, nil
+			}
 			if m.FocusedSorter > 0 {
 				m.FocusedSorter--
 			}
-		case "right":
-			m.CodeView = true
-		case "left":
-			m.CodeView = false
+		case "r":
+			// Randomise
+			if !m.VisualisationRunning {
+				m.Items = sorter.GetRandomItems(VISUALISATION_SIZE)
+				m.VisualisationRan = false
+			}
+		case " ":
+			// Start Sorting Process
+			if !m.VisualisationRunning && !m.VisualisationRan {
+				m.VisualisationRunning = true
+				sorter := m.Sorters[m.SelectedSorter]
+				return m, tea.Batch(
+					sorter.Sort(m.Items, m.Sub),
+					sorter.WaitForSort(m.Sub),
+				)
+			}
 		}
 	}
 	return m, nil
@@ -95,7 +131,7 @@ func (m MainModel) View() string {
 	navTitle := navItem.Copy().
 		Border(lipgloss.NormalBorder(), false, false, true, false).
 		BorderForeground(subtle).
-		Render("sort algorithm")
+		Render("Sort Algorithm")
 
 	var sorters string
 	for i, sorter := range m.Sorters {
@@ -122,7 +158,7 @@ func (m MainModel) View() string {
 		))
 
 	// Info Section (3 Column wide)
-	gap := lipgloss.NewStyle().Height(1).Width(m.ColumnWidth*3 - 2).Render()
+	info := lipgloss.NewStyle().Height(1).Width(m.ColumnWidth*3 - 2).Render("Information")
 	infoTitle := lipgloss.NewStyle().
 		Height(1).
 		Width(m.ColumnWidth*3-2).
@@ -141,21 +177,30 @@ func (m MainModel) View() string {
 		Height(base.GetHeight()).
 		Width(m.ColumnWidth*3).
 		Padding(0, 1).
-		Render(lipgloss.JoinVertical(lipgloss.Top, gap, infoTitle, description, complexity))
+		Render(lipgloss.JoinVertical(lipgloss.Top, info, infoTitle, description, complexity))
 
 	// Visualisation Section (2 Column wide)
-
+	visGap := lipgloss.NewStyle().Height(1).Width(m.ColumnWidth*2 - 2).Render()
 	visTitle := lipgloss.NewStyle().
 		Height(1).
-		Width(m.ColumnWidth*3-2).
-		Border(lipgloss.NormalBorder(), true, false, true, false).
+		Width(m.ColumnWidth*2-2).
+		Border(lipgloss.NormalBorder(), false, false, true, false).
 		BorderForeground(subtle).
-		Render("visualisation")
+		Render("Visualisation")
+
+	xs := []int{}
+	for _, item := range m.Items {
+		xs = append(xs, item.Value)
+	}
+	visSlice := lipgloss.NewStyle().
+		Width(m.ColumnWidth*2 - 2).
+		Render(fmt.Sprintf("%v", xs))
+
 	vis := lipgloss.NewStyle().
 		Height(base.GetHeight()).
 		Width(m.ColumnWidth*2).
 		Padding(0, 1).
-		Render("Vis Section")
+		Render(lipgloss.JoinVertical(lipgloss.Top, visTitle, visGap, visSlice))
 
 	return base.Render(lipgloss.JoinHorizontal(
 		lipgloss.Left,
