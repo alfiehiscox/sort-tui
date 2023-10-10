@@ -139,28 +139,36 @@ func (m MainModel) View() string {
 		BorderForeground(subtle).
 		Align(lipgloss.Center)
 
-	var tabs string
+	var main string
 	if m.CodeView {
-		tabs = lipgloss.JoinHorizontal(
+		tabs := lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			detailsTab.Render("details"),
 			codeTab.Background(selected).Render("code"),
 		)
+		main = lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), false, true, false, false).
+			BorderForeground(subtle).
+			Height(base.GetHeight()).
+			Width(m.ColumnWidth*3).
+			Padding(0, 1).
+			Render(lipgloss.JoinVertical(lipgloss.Top, infoTitle, tabs))
 	} else {
-		tabs = lipgloss.JoinHorizontal(
+		tabs := lipgloss.JoinHorizontal(
 			lipgloss.Left,
 			detailsTab.Background(selected).Render("details"),
 			codeTab.Render("code"),
 		)
+		complexity := "Complexity: \n"
+		complexity += RenderComplexity(m.Sorters[m.SelectedSorter].Complexity(), m.ColumnWidth*3-2)
+		main = lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), false, true, false, false).
+			BorderForeground(subtle).
+			Height(base.GetHeight()).
+			Width(m.ColumnWidth*3).
+			Padding(0, 1).
+			Render(lipgloss.JoinVertical(lipgloss.Top, infoTitle, tabs, complexity))
 	}
-
-	info := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, true, false, false).
-		BorderForeground(subtle).
-		Height(base.GetHeight()).
-		Width(m.ColumnWidth*3).
-		Padding(0, 1).
-		Render(lipgloss.JoinVertical(lipgloss.Top, infoTitle, tabs))
 
 	// Visualisation Section
 	vis := lipgloss.NewStyle().
@@ -171,6 +179,38 @@ func (m MainModel) View() string {
 
 	return base.Render(lipgloss.JoinHorizontal(
 		lipgloss.Left,
-		nav, info, vis,
+		nav, main, vis,
 	))
+}
+
+func RenderComplexity(c sorter.Complexity, width int) string {
+	subtle := lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
+	selected := lipgloss.Color("#55628F")
+
+	columnWidth := width / 4
+	cell := lipgloss.NewStyle().
+		Width(columnWidth).
+		Height(1).
+		Border(lipgloss.NormalBorder(), false, false, true, false).
+		BorderForeground(subtle).Align(lipgloss.Left).
+		PaddingLeft(1)
+	time := cell.Copy().
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		Width(columnWidth * 3).Render("time")
+	space := cell.Copy().
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		Render("time")
+	timeBest := cell.Render("best")
+	timeAvg := cell.Render("avg")
+	timeWorst := cell.Render("worst")
+	spaceWorst := cell.Render("worst")
+	acTimeBest := cell.Background(selected).Render(c.TimeBest)
+	acTimeAvg := cell.Render(c.TimeAvg)
+	acTimeWorst := cell.Render(c.TimeWorst)
+	acSpaceWorst := cell.Render(c.SpaceWorst)
+
+	row1 := lipgloss.JoinHorizontal(lipgloss.Left, time, space)
+	row2 := lipgloss.JoinHorizontal(lipgloss.Left, timeBest, timeAvg, timeWorst, spaceWorst)
+	row3 := lipgloss.JoinHorizontal(lipgloss.Left, acTimeBest, acTimeAvg, acTimeWorst, acSpaceWorst)
+	return lipgloss.JoinVertical(lipgloss.Top, row1, row2, row3)
 }

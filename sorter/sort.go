@@ -87,10 +87,10 @@ func (is *AlfieSort) Name() string        { return "alfiesort" }
 func (is *AlfieSort) Code() string        { return "INSERTION CODE" }
 func (is *AlfieSort) Complexity() Complexity {
 	return Complexity{
-		TimeBest:   "O(n)",
-		TimeWorst:  "O(n^2)",
-		TimeAvg:    "O(n^2)",
-		SpaceWorst: "O(1)",
+		TimeBest:   "O(n^6)",
+		TimeWorst:  "O(n^n)",
+		TimeAvg:    "O(e)",
+		SpaceWorst: "O(!)",
 	}
 }
 
