@@ -52,7 +52,6 @@ func (bs *BubbleSort) Sort(items []Item, sub chan []Item) tea.Cmd {
 				break
 			}
 		}
-		sub <- items
 		return FinishMsg{}
 	}
 }

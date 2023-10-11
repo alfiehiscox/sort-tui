@@ -18,6 +18,7 @@ const (
 var Sorters = []Sorter{
 	&InsertionSort{},
 	&BubbleSort{},
+	&SelectionSort{},
 }
 
 type Item struct {
