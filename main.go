@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
@@ -20,35 +21,35 @@ func main() {
 		FocusedSorter:        0,
 		VisualisationRunning: false,
 		VisualisationRan:     false,
-		Items:                sorter.GetRandomItems(VISUALISATION_SIZE),
-		Sub:                  make(chan []sorter.Item),
+		// Items:                sorter.GetRandomItems(VISUALISATION_SIZE),
+		Sub: make(chan []sorter.Item),
 	}
 
-	p = tea.NewProgram(main)
+	p = tea.NewProgram(main, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Println("error running program:", err)
 		os.Exit(1)
 	}
 }
 
-// MAIN UI Element
 const (
-	COLUMN_NUM         = 6 // How many vertical columns are there
-	MARGIN_VERTICAL    = 0
-	MARGIN_HORIZONTAL  = 1
-	VISUALISATION_SIZE = 19
+	COLUMN_NUM        = 6 // How many vertical columns are there
+	MARGIN_VERTICAL   = 0
+	MARGIN_HORIZONTAL = 1
+	// VISUALISATION_SIZE = 19
 )
 
 var ()
 
 type MainModel struct {
-	Width, Height        int
-	ColumnWidth          int
-	Sorters              []sorter.Sorter
-	SelectedSorter       int // Actually being rendered
-	FocusedSorter        int // Highlighted Over
-	VisualisationRunning bool
-	VisualisationRan     bool
+	Width, Height         int
+	ColumnWidth           int
+	Sorters               []sorter.Sorter
+	SelectedSorter        int // Actually being rendered
+	FocusedSorter         int // Highlighted Over
+	VisualisationRunning  bool
+	VisualisationRan      bool
+	VisualistationMaxElem int // The max elements to fit in the visualisation
 
 	Items []sorter.Item // Item Visualiser
 	Sub   chan []sorter.Item
@@ -60,7 +61,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.Width, m.Height = msg.Width-MARGIN_HORIZONTAL, msg.Height-MARGIN_VERTICAL
-		m.ColumnWidth = m.Width / COLUMN_NUM
+		if m.ColumnWidth != m.Width/COLUMN_NUM {
+			m.ColumnWidth = m.Width / COLUMN_NUM
+			maxCell := 2*m.ColumnWidth - 2 - 2
+			m.VisualistationMaxElem = sorter.MaxArrayFromCells(maxCell)
+			m.Items = sorter.GetRandomItems(m.VisualistationMaxElem)
+		}
 		return m, nil
 	case sorter.UpdateMsg:
 		m.Items = msg
@@ -95,7 +101,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			// Randomise
 			if !m.VisualisationRunning {
-				m.Items = sorter.GetRandomItems(VISUALISATION_SIZE)
+				m.Items = sorter.GetRandomItems(m.VisualistationMaxElem)
 				m.VisualisationRan = false
 			}
 		case " ":
@@ -187,20 +193,52 @@ func (m MainModel) View() string {
 		Border(lipgloss.NormalBorder(), false, false, true, false).
 		BorderForeground(subtle).
 		Render("Visualisation")
+	bar := lipgloss.NewStyle().
+		Width(m.ColumnWidth*2 - 2).
+		Align(lipgloss.Left)
 
-	xs := []int{}
-	for _, item := range m.Items {
-		xs = append(xs, item.Value)
+	var xs bytes.Buffer
+	xs.WriteByte('(')
+	bars := []string{}
+	for i, item := range m.Items {
+		// Do some colouring thing here probably
+		elem := ""
+		if i == len(m.Items)-1 {
+			elem = "%d)"
+		} else {
+			elem = "%d,"
+		}
+		if !item.Focused {
+			xs.WriteString(fmt.Sprintf(elem, item.Value))
+		} else {
+			xs.WriteString(
+				lipgloss.NewStyle().Foreground(selected).Render(
+					fmt.Sprintf(elem, item.Value),
+				),
+			)
+		}
+
+		if item.Focused {
+			bars = append(bars, bar.Copy().Foreground(selected).Render(item.Bar))
+		} else {
+			bars = append(bars, bar.Render(item.Bar))
+		}
 	}
+
 	visSlice := lipgloss.NewStyle().
 		Width(m.ColumnWidth*2 - 2).
-		Render(fmt.Sprintf("%v", xs))
+		Align(lipgloss.Center).
+		Render(xs.String())
+	visBars := lipgloss.NewStyle().
+		Width(m.ColumnWidth*2 - 2).
+		PaddingLeft(2).
+		Render(lipgloss.JoinVertical(lipgloss.Top, bars...))
 
 	vis := lipgloss.NewStyle().
 		Height(base.GetHeight()).
 		Width(m.ColumnWidth*2).
 		Padding(0, 1).
-		Render(lipgloss.JoinVertical(lipgloss.Top, visTitle, visGap, visSlice))
+		Render(lipgloss.JoinVertical(lipgloss.Top, visTitle, visGap, visSlice, visGap, visBars))
 
 	return base.Render(lipgloss.JoinHorizontal(
 		lipgloss.Left,
@@ -221,14 +259,14 @@ func RenderComplexity(c sorter.Complexity, width int) string {
 		PaddingLeft(1)
 	time := cell.Copy().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
-		Width(columnWidth * 3).Render("time")
+		Width(columnWidth * 3).Render("Time")
 	space := cell.Copy().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
-		Render("space")
-	timeBest := cell.Render("best")
-	timeAvg := cell.Render("avg")
-	timeWorst := cell.Render("worst")
-	spaceWorst := cell.Render("worst")
+		Render("Space")
+	timeBest := cell.Render("Best")
+	timeAvg := cell.Render("Avg")
+	timeWorst := cell.Render("Worst")
+	spaceWorst := cell.Render("Worst")
 	acTimeBest := cell.Background(selected).Render(c.TimeBest)
 	acTimeAvg := cell.Render(c.TimeAvg)
 	acTimeWorst := cell.Render(c.TimeWorst)
