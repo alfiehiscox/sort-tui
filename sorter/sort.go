@@ -19,6 +19,7 @@ var Sorters = []Sorter{
 	&InsertionSort{},
 	&BubbleSort{},
 	&SelectionSort{},
+	&MergeSort{},
 }
 
 type Item struct {
