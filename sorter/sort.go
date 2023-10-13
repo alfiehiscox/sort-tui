@@ -20,12 +20,14 @@ var Sorters = []Sorter{
 	&BubbleSort{},
 	&SelectionSort{},
 	&MergeSort{},
+	&Quicksort{},
 }
 
 type Item struct {
 	Value   int
 	Bar     string
 	Focused bool
+	Index   int
 }
 
 type Complexity struct {
@@ -81,11 +83,12 @@ func MaxArrayFromCells(maxCell int) int {
 func GetRandomItems(size int) []Item {
 	var items []Item
 	values := rand.Perm(size)
-	for _, value := range values {
+	for i, value := range values {
 		items = append(items, Item{
 			Value:   value + 1,
 			Bar:     makeBar(value + 1),
 			Focused: false,
+			Index:   i,
 		})
 	}
 	return items

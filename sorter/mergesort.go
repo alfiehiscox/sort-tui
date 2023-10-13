@@ -53,25 +53,22 @@ func (ms *MergeSort) merge(left, right []Item, sub chan []Item) []Item {
 		if i >= len(left) {
 			result[k] = right[j]
 			ms.hotswappy(right[j], offset+k)
-			sub <- ms.copy
 			j++
 		} else if j >= len(right) {
 			result[k] = left[i]
 			ms.hotswappy(left[i], offset+k)
-			sub <- ms.copy
 			i++
 		} else if left[i].Value < right[j].Value {
 			result[k] = left[i]
 			ms.hotswappy(left[i], offset+k)
-			sub <- ms.copy
 			i++
 		} else {
 			result[k] = right[j]
 			ms.hotswappy(right[j], offset+k)
-			sub <- ms.copy
 			j++
 		}
 		time.Sleep(TIME_INTERVAL / 2)
+		sub <- ms.copy
 	}
 
 	return result
